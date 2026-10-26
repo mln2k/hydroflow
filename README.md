@@ -71,7 +71,7 @@ npx playwright install chromium
 
 Запустите сервер, задайте `HF_TEST_PASSWORD` и при необходимости `HF_TEST_EMAIL`, затем выполните `node tests/browser_smoke.cjs`. Сценарий создаёт отдельный тестовый проект, проверяет версии, комментарии, назначение, загрузку/скачивание файла и отчёт. Для CI предусмотрены отдельные задания SQLite, PostgreSQL и Chromium в `.github/workflows/tests.yml`.
 
-Фактически выполненные проверки и ограничения среды описаны в [docs/testing.md](docs/testing.md). Наличие workflow не означает, что удалённая проверка уже выполнена.
+В [первом запуске GitHub Actions](https://github.com/mln2k/hydroflow/actions/runs/40357317673) успешно завершились все пять заданий: SQLite на Python 3.11–3.13, PostgreSQL 16 и браузерный сценарий Chromium. Подробности и оставшиеся ограничения описаны в [docs/testing.md](docs/testing.md).
 
 ## Документация
 
