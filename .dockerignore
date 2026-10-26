@@ -1,0 +1,12 @@
+.git
+.venv
+__pycache__
+data
+backups
+.env
+node_modules
+test-results
+playwright-report
+*.db
+*.db-shm
+*.db-wal

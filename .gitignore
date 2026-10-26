@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+data/
+backups/
+*.db
+*.db-shm
+*.db-wal
+node_modules/
+test-results/
+playwright-report/
+*.log
