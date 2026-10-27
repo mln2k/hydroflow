@@ -58,6 +58,33 @@ const {randomUUID}=require('node:crypto');
       assert.equal(await page.evaluate(()=>window.auditXss),undefined);
     }
     await openProject(admin.page);
+    // Этап, связь задачи и поиск через интерфейс.
+    await tab(admin.page,'Этапы');await tab(admin.page,'+ Этап');
+    await admin.page.getByLabel('Название',{exact:true}).fill('Audit stage');
+    await admin.page.getByLabel('Начало',{exact:true}).fill('2026-02-01');
+    await admin.page.getByLabel('Окончание',{exact:true}).fill('2026-01-01');
+    await tab(admin.page,'Сохранить');await expect(admin.page.locator('#editor .error')).toContainText('раньше');
+    await admin.page.getByLabel('Окончание',{exact:true}).fill('2026-03-01');
+    await tab(admin.page,'Сохранить');await expect(admin.page.locator('#modal')).not.toBeVisible();
+    await tab(admin.page,'Задачи');await tab(admin.page,'Task '+payload);await tab(admin.page,'Редактировать');
+    await admin.page.getByLabel('Этап',{exact:true}).selectOption({label:'Audit stage'});
+    await tab(admin.page,'Сохранить');await expect(admin.page.locator('#modal')).not.toBeVisible();
+    await tab(admin.page,'Требования');await admin.page.getByLabel('Поиск',{exact:true}).fill('no-matching-title');
+    await expect(admin.page.getByText('Записей пока нет или ничего не найдено.')).toBeVisible();
+    await admin.page.getByLabel('Поиск',{exact:true}).fill('');
+    await expect(admin.page.getByRole('button',{name:'Requirement '+payload,exact:true})).toBeVisible();
+    // Выгрузки проверяются по содержимому, включая защиту от CSV-формул.
+    await admin.api(root+'/tasks','POST',{title:'=HYPERLINK("https://invalid.example")'},201);
+    await tab(admin.page,'Отчёты');
+    const csvDownload=admin.page.waitForEvent('download');await admin.page.getByRole('link',{name:'Скачать задачи в CSV'}).click();
+    assert.match(await readFile(await (await csvDownload).path(),'utf8'),/'=HYPERLINK/);
+    const jsonDownload=admin.page.waitForEvent('download');await tab(admin.page,'Скачать полный отчёт JSON');
+    const report=JSON.parse(await readFile(await (await jsonDownload).path(),'utf8'));
+    assert.equal(report.project,project);assert.equal(report.total_tasks,2);
+    await admin.page.emulateMedia({media:'print'});
+    await expect(admin.page.getByRole('heading',{name:'Влияние изменений требований'})).toBeVisible();
+    await expect(admin.page.locator('.sidebar')).not.toBeVisible();
+    await admin.page.emulateMedia({media:'screen'});
     // Две открытые формы: проигравшая правка не закрывается и не теряет текст.
     await tab(admin.page,'Документы');
     await tab(admin.page,'Document '+payload);await tab(admin.page,'Редактировать');
@@ -137,10 +164,34 @@ const {randomUUID}=require('node:crypto');
         for(const name of ['Обзор','Требования','Задачи','Этапы','Документы','Команда','Отчёты','История']){
           await tab(page,name);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,name+' mobile overflow');
         }
+        await tab(page,'Документы');await tab(page,'Document '+payload);
+        await tab(admin.page,'Команда и доступ');
+        const accountRow=admin.page.getByRole('row').filter({hasText:users.VIEWER.email});
+        await accountRow.getByRole('button',{name:'Заблокировать',exact:true}).click();
+        await expect(accountRow.getByRole('button',{name:'Разблокировать',exact:true})).toBeVisible();
+        await tab(page,'История версий');
+        await expect(page.getByRole('heading',{name:'Вход в систему'})).toBeVisible();
+        await expect(page.locator('#modal')).not.toBeVisible();
+        await user.api('/login','POST',{email:users.VIEWER.email,password},401);
+        await accountRow.getByRole('button',{name:'Разблокировать',exact:true}).click();
+        await expect(accountRow.getByRole('button',{name:'Заблокировать',exact:true})).toBeVisible();
+      }
+      if(role==='QA'){
+        await tab(page,'Сменить пароль');await expect(page.getByLabel('Текущий пароль')).toBeFocused();
+        await page.keyboard.press('Escape');await expect(page.locator('#modal')).not.toBeVisible();
+        await tab(page,'Сменить пароль');
+        await page.getByLabel('Текущий пароль').fill(password);
+        await page.getByLabel('Новый пароль').fill(password+'-new');await tab(page,'Сохранить');
+        await expect(page.getByRole('heading',{name:'Вход в систему'})).toBeVisible();
+        await user.api('/login','POST',{email:users.QA.email,password},401);
+        await page.getByLabel('Электронная почта').fill(users.QA.email);
+        await page.getByLabel('Пароль',{exact:true}).fill(password+'-new');await tab(page,'Войти');
+        await expect(page.getByRole('heading',{name:'Проекты',exact:true})).toBeVisible();
       }
       await user.context.close();
     }
     // Потеря сессии закрывает диалог, а повторная загрузка после сбоя сети доступна.
+    await openProject(admin.page);
     await tab(admin.page,'Требования');await tab(admin.page,'Requirement '+payload);
     await admin.api('/logout','POST',{});
     await tab(admin.page,'История версий');
@@ -150,6 +201,6 @@ const {randomUUID}=require('node:crypto');
     await expect(admin.page.getByRole('button',{name:'Повторить загрузку'})).toBeVisible();
     await tab(admin.page,'Повторить загрузку');await expect(admin.page.getByRole('heading',{name:'Вход в систему'})).toBeVisible();
     assert.deepEqual(errors,[]);
-    console.log('Browser audit: OK — roles, project PM, approval, conflict, old attachment bytes, rendered XSS, retry, duplicate submit, mobile tabs, expired session');
+    console.log('Browser audit: OK — roles, project PM, approval, conflict, old attachment bytes, rendered XSS, retry, duplicate submit, mobile tabs, stages, search, CSV/JSON/print, password, blocking, expired session');
   }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
