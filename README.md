@@ -71,7 +71,7 @@ npx playwright install chromium
 
 Запустите сервер на отдельной тестовой базе, задайте `HF_TEST_PASSWORD` и при необходимости `HF_TEST_EMAIL` и `HF_TEST_URL`, затем выполните `node tests/browser_smoke.cjs` и `node tests/browser_audit.cjs`. Второй сценарий требует администратора и создаёт синтетические учётные записи для всех ролей. Для установленного Chrome можно задать `HF_BROWSER_CHANNEL=chrome`. В CI предусмотрены SQLite, PostgreSQL, Chromium и Docker Compose.
 
-В [первом запуске GitHub Actions](https://github.com/mln2k/hydroflow/actions/runs/40357317673) успешно завершились все пять заданий: SQLite на Python 3.11–3.13, PostgreSQL 16 и браузерный сценарий Chromium. Подробности и оставшиеся ограничения описаны в [docs/testing.md](docs/testing.md).
+После аудита 27 октября в [GitHub Actions #5](https://github.com/mln2k/hydroflow/actions/runs/40499708234) успешно завершились все шесть заданий: 44 теста на SQLite с Python 3.11–3.13, PostgreSQL 16, два браузерных сценария Chromium и Docker Compose. Подробности, исторические результаты и ограничения описаны в [docs/testing.md](docs/testing.md).
 
 ## Документация
 

@@ -36,7 +36,16 @@
 
 В workflow добавлены новый браузерный аудит, синтаксические проверки и сборка/запуск Docker Compose с отдельными CI-данными. Actions закреплены по SHA веток v6; совместимость Node 24 и требования к runner сверены с официальными [checkout](https://github.com/actions/checkout/tree/v6), [setup-python](https://github.com/actions/setup-python/tree/v6), [setup-node](https://github.com/actions/setup-node/tree/v6). Используются GitHub-hosted ubuntu-latest и contents: read. Версии Python приложения 3.11–3.13 и Node приложения 22 сохранены. Диапазон psycopg 3 оставлен без необоснованной смены основной версии.
 
-Локально PostgreSQL и Docker отсутствуют. Результаты нового удалённого запуска будут внесены после завершения CI; наличие теста в workflow само по себе не означает его успешное выполнение.
+Локально PostgreSQL и Docker отсутствуют. Они проверены в [GitHub Actions #5](https://github.com/mln2k/hydroflow/actions/runs/40499708234), коммит `055421f2c1e85153c0abe7ca60e534f799d54675`: все шесть заданий завершились успешно.
+
+| CI-задание | Подтверждённый результат |
+| --- | --- |
+| SQLite, Python 3.11 / 3.12 / 3.13 | 44 теста и compileall на каждой версии |
+| PostgreSQL 16, Python 3.12 | 44 теста: 42 проверки приложения на PostgreSQL и 2 CLI-проверки на временной SQLite; конкурентные сценарии прошли |
+| Chromium, Node 22 / Python 3.12 | browser_smoke.cjs и browser_audit.cjs, проверка синтаксиса JS |
+| Docker | compose config/build; SQLite init без root; PostgreSQL init и повторный init; запуск приложения с healthcheck и HTTP /api/health |
+
+Это проверки изолированного CI, не рабочей установки. Схема и существующие пользовательские данные не преобразовывались. Draft PR: [#1](https://github.com/mln2k/hydroflow/pull/1).
 
 Не выполнены нагрузочные испытания, полная ручная проверка клавиатуры/скринридера, визуальная приёмка всех экранов, антивирусная проверка вложений и испытания производственной инфраструктуры. Блокировки PostgreSQL требуют проверки на целевой нагрузке. Сохранённые назначения заблокированного пользователя обрабатывает руководитель. Прогресс по-прежнему считается по количеству задач.
 
