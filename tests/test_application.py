@@ -6,6 +6,8 @@ import os
 import tempfile
 import threading
 import unittest
+import uuid
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from pathlib import Path
 from hydroflow.db import migrate, transaction
 from hydroflow.security import hash_password, now, verify_password
@@ -19,13 +21,27 @@ HASH=hash_password(PASSWORD)
 class Fixture(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()
-        self.url=os.getenv('TEST_DATABASE_URL') or 'sqlite:///'+str(Path(self.temp.name)/'test.db')
+        self.addCleanup(self.temp.cleanup)
+        self.url='sqlite:///'+str(Path(self.temp.name)/'test.db')
+        external=os.getenv('TEST_DATABASE_URL')
+        if external:
+            if not external.startswith(('postgresql://', 'postgres://')):
+                raise ValueError('TEST_DATABASE_URL поддерживает только отдельную PostgreSQL БД; SQLite всегда временная')
+            import psycopg
+            from psycopg import sql
+            schema='hydroflow_test_'+uuid.uuid4().hex
+            with psycopg.connect(external) as conn:
+                conn.execute(sql.SQL('CREATE SCHEMA {}').format(sql.Identifier(schema)))
+            def cleanup_schema():
+                with psycopg.connect(external) as conn:
+                    conn.execute(sql.SQL('DROP SCHEMA {} CASCADE').format(sql.Identifier(schema)))
+            self.addCleanup(cleanup_schema)
+            parts=urlsplit(external)
+            query=[(k,v) for k,v in parse_qsl(parts.query) if k!='options']
+            query.append(('options','-csearch_path='+schema))
+            self.url=urlunsplit(parts._replace(query=urlencode(query)))
         migrate(self.url)
         with transaction(self.url) as db:
-            # TEST_DATABASE_URL должен указывать только на выделенную тестовую БД.
-            for table in ('audit_log','comments','document_versions','documents','task_assignments','tasks',
-                          'requirement_versions','requirements','stages','project_members','projects','sessions','users'):
-                db.execute(f'DELETE FROM {table}')
             self.users={}
             for role in s.ROLES:
                 uid=db.insert('users',dict(email=role.lower()+'@example.local',full_name=role,
@@ -195,7 +211,7 @@ class ApplicationTests(Fixture):
             self.assertFalse(db.one('SELECT id FROM tasks'))
 
 
-class HTTPTests(Fixture):
+class HTTPFixture(Fixture):
     def setUp(self):
         super().setUp()
         ATTEMPTS.clear()
@@ -226,6 +242,8 @@ class HTTPTests(Fixture):
         self.cookie=headers['Set-Cookie'].split(';')[0];self.csrf=result['csrf']
         return headers
 
+
+class HTTPTests(HTTPFixture):
     def test_http_authentication_csrf_logout(self):
         self.assertEqual(self.request('/projects')[0],401)
         headers=self.login()

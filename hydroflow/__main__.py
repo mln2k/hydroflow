@@ -33,9 +33,25 @@ def main():
         if target.exists():
             parser.error('Файл назначения уже существует')
         target.parent.mkdir(parents=True,exist_ok=True)
-        source=sqlite3.connect(url.removeprefix('sqlite:///'))
-        destination=sqlite3.connect(target)
-        source.backup(destination); destination.close(); source.close()
+        source_path=Path(url.removeprefix('sqlite:///')).resolve()
+        if not source_path.is_file():
+            parser.error('Исходная база не найдена; пустая копия не создана')
+        source=sqlite3.connect(source_path.as_uri()+'?mode=ro',uri=True)
+        try:
+            # Эксклюзивное создание исключает перезапись чужой копии между exists и connect.
+            with target.open('xb'):
+                pass
+            try:
+                destination=sqlite3.connect(target)
+                try:
+                    source.backup(destination)
+                finally:
+                    destination.close()
+            except BaseException:
+                target.unlink()
+                raise
+        finally:
+            source.close()
         print(f'Резервная копия: {target}')
         return
     migrate()
