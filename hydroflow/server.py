@@ -14,7 +14,7 @@ from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit, parse_qs
-from .db import transaction
+from .db import transaction, Conflict
 from .security import now, future, token_hash, verify_password, hash_password
 from . import services as s
 
@@ -53,8 +53,13 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get('Content-Length','0'))
             if not 0 < length <= 7_500_000:
                 raise s.Error('Недопустимый размер запроса',413)
-            data = json.loads(self.rfile.read(length))
-        except (ValueError, UnicodeDecodeError):
+            raw = self.rfile.read(length)
+            # Не принимаем NaN/Infinity и суррогаты, которые не кодируются в UTF-8.
+            def invalid_constant(value):
+                raise ValueError(value)
+            data = json.loads(raw, parse_constant=invalid_constant)
+            json.dumps(data, ensure_ascii=False).encode('utf-8')
+        except (ValueError, UnicodeError, RecursionError):
             raise s.Error('Некорректный JSON') from None
         if not isinstance(data,dict):
             raise s.Error('Ожидается JSON-объект')
@@ -105,22 +110,25 @@ class Handler(BaseHTTPRequestHandler):
                 with transaction(self.server.db_url) as db:
                     db.execute('SELECT 1')
                 return self.send(200,{'ok':True})
+            if method != 'GET':
+                self.check_origin()
+            # Не держим блокировку SQLite, пока клиент передаёт тело запроса.
+            data = self.body() if method in ('POST','PATCH','DELETE') else {}
             with transaction(self.server.db_url) as db:
-                status,value,ctype,headers = self.api(db,method,path)
+                status,value,ctype,headers = self.api(db,method,path,data)
             self.send(status,value,ctype,headers)
         except s.Error as e:
             self.send(e.status,{'error':str(e)})
+        except Conflict as e:
+            self.send(409,{'error':str(e)})
         except (BrokenPipeError, ConnectionResetError):
             pass
         except Exception:
             LOG.exception('Ошибка запроса')
             self.send(500,{'error':'Внутренняя ошибка сервера'})
 
-    def api(self, db, method, path):
+    def api(self, db, method, path, data):
         ctype,headers = 'application/json; charset=utf-8',{}
-        data = self.body() if method in ('POST','PATCH','DELETE') else {}
-        if method != 'GET':
-            self.check_origin()
         if path=='/api/login' and method=='POST':
             email = data.get('email','')
             if not isinstance(email,str) or len(email)>120:
@@ -138,7 +146,7 @@ class Handler(BaseHTTPRequestHandler):
                 if len(bucket)>=15:
                     raise s.Error('Слишком много попыток. Повторите через 15 минут',429)
                 bucket.append(current)
-            user = db.one('SELECT * FROM users WHERE email=?',(email.lower().strip(),))
+            user = db.locked_one('SELECT * FROM users WHERE email=?',(email.lower().strip(),))
             valid = verify_password(data.get('password',''), user['password_hash'] if user else DUMMY_PASSWORD)
             if not user or not valid or not user['active']:
                 raise s.Error('Неверный email или пароль',401)
@@ -148,7 +156,7 @@ class Handler(BaseHTTPRequestHandler):
             headers['Set-Cookie']=self.cookie(token)
             return 200,{'csrf':csrf,'user':{k:user[k] for k in ('id','email','full_name','role')}},ctype,headers
         user = self.session(db)
-        if method!='GET' and not hmac.compare_digest(self.headers.get('X-CSRF-Token',''),user['csrf']):
+        if method!='GET' and not hmac.compare_digest(self.headers.get('X-CSRF-Token','').encode(),user['csrf'].encode()):
             raise s.Error('Ошибка CSRF. Обновите страницу',403)
         if path=='/api/me' and method=='GET':
             return 200,{'user':{k:user[k] for k in ('id','email','full_name','role')},'csrf':user['csrf']},ctype,headers
@@ -157,7 +165,7 @@ class Handler(BaseHTTPRequestHandler):
             headers['Set-Cookie']=self.cookie(clear=True)
             return 200,{'ok':True},ctype,headers
         if path=='/api/password' and method=='POST':
-            account=db.one('SELECT password_hash FROM users WHERE id=?',(user['id'],))
+            account=db.locked_one('SELECT password_hash FROM users WHERE id=?',(user['id'],))
             if not verify_password(data.get('current_password',''),account['password_hash']):
                 raise s.Error('Текущий пароль указан неверно',403)
             try:
@@ -177,7 +185,7 @@ class Handler(BaseHTTPRequestHandler):
         match=re.fullmatch(r'/api/users/(\d+)',path)
         if match and method=='PATCH':
             s.allow(user['role'],('ADMIN',))
-            uid=int(match[1])
+            uid=s.number(match[1])
             if uid==user['id']:
                 raise s.Error('Изменение собственной роли или активности запрещено')
             if not db.one('SELECT id FROM users WHERE id=?',(uid,)):
@@ -203,8 +211,11 @@ class Handler(BaseHTTPRequestHandler):
         match=re.fullmatch(r'/api/projects/(\d+)(?:/(.*))?',path)
         if not match:
             raise s.Error('Метод не найден',404)
-        pid=int(match[1]); tail=match[2] or ''
-        s.project_role(db,user,pid)
+        pid=s.number(match[1]); tail=match[2] or ''
+        role=s.project_role(db,user,pid,write=method!='GET')
+        if tail=='member-candidates' and method=='GET':
+            s.allow(role,('ADMIN','PM'))
+            return 200,db.all('SELECT id,email,full_name,active FROM users WHERE active=1 ORDER BY full_name'),ctype,headers
         if not tail:
             if method=='GET':
                 return 200,s.project_detail(db,user,pid),ctype,headers
@@ -229,7 +240,7 @@ class Handler(BaseHTTPRequestHandler):
             return 200,result,ctype,headers
         match=re.fullmatch(r'(requirements|tasks|documents|stages)(?:/(\d+))?(?:/(versions|assignments))?',tail)
         if match:
-            entity,eid,action=match.groups(); eid=int(eid) if eid else None
+            entity,eid,action=match.groups(); eid=s.number(eid) if eid else None
             if eid:
                 record=s.get_entity(db,entity,eid,pid)
             if action=='assignments' and entity=='tasks' and method=='POST':

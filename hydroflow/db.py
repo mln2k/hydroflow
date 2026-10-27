@@ -5,6 +5,10 @@ from contextlib import contextmanager
 from pathlib import Path
 
 
+class Conflict(Exception):
+    """Нарушение ограничения БД; детали SQL не передаются клиенту."""
+
+
 class DB:
     def __init__(self, url=None):
         self.url = url or os.getenv("DATABASE_URL", "sqlite:///data/hydroflow.db")
@@ -27,6 +31,10 @@ class DB:
     def execute(self, sql, params=()):
         return self.conn.execute(sql.replace("?", "%s") if self.pg else sql, params)
 
+    def locked_one(self, sql, params=(), shared=False):
+        suffix = (' FOR SHARE' if shared else ' FOR UPDATE') if self.pg else ''
+        return self.one(sql + suffix, params)
+
     def all(self, sql, params=()):
         return [dict(r) for r in self.execute(sql, params).fetchall()]
 
@@ -46,8 +54,14 @@ def transaction(url=None):
     try:
         yield db
         db.conn.commit()
-    except BaseException:
+    except BaseException as error:
         db.conn.rollback()
+        integrity_error = sqlite3.IntegrityError
+        if db.pg:
+            import psycopg
+            integrity_error = psycopg.IntegrityError
+        if isinstance(error, integrity_error):
+            raise Conflict('Конфликт данных или связей. Обновите страницу') from error
         raise
     finally:
         db.conn.close()

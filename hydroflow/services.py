@@ -44,7 +44,7 @@ def number(value):
         result = int(value)
     except (TypeError, ValueError):
         raise Error("Некорректный идентификатор") from None
-    if str(result) != str(value) or result < 1:
+    if str(result) != str(value) or not 1 <= result <= 9223372036854775807:
         raise Error("Некорректный идентификатор")
     return result
 
@@ -71,8 +71,11 @@ def audit(db, user, project, action, entity, entity_id, detail=''):
                                entity_type=entity, entity_id=entity_id, detail=detail, created_at=now()))
 
 
-def project_role(db, user, pid):
-    if not db.one('SELECT id FROM projects WHERE id=?', (pid,)):
+def project_role(db, user, pid, write=False):
+    # Общая блокировка проекта сериализует проверки связей и запись в PostgreSQL.
+    # SQLite уже сериализует транзакции через BEGIN IMMEDIATE.
+    read = db.locked_one if write else db.one
+    if not read('SELECT id FROM projects WHERE id=?', (pid,)):
         raise Error("Проект не найден", 404)
     if user['role'] == 'ADMIN':
         return 'ADMIN'
@@ -116,7 +119,7 @@ def list_projects(db, user):
 
 def save_project(db, user, data, pid=None):
     if pid:
-        allow(project_role(db, user, pid), ('ADMIN', 'PM'))
+        allow(project_role(db, user, pid, write=True), ('ADMIN', 'PM'))
         old = db.one('SELECT * FROM projects WHERE id=?', (pid,))
         data = {**old, **data}
     else:
@@ -142,10 +145,10 @@ def update(db, table, eid, values):
 
 
 def membership(db, user, pid, data, remove=False):
-    allow(project_role(db, user, pid), ('ADMIN','PM'))
+    allow(project_role(db, user, pid, write=True), ('ADMIN','PM'))
     uid = number(data.get('user_id'))
-    account = db.one('SELECT id,active FROM users WHERE id=?', (uid,))
-    if not account or not account['active']:
+    account = db.locked_one('SELECT id,active FROM users WHERE id=?', (uid,), shared=True)
+    if not account or (not remove and not account['active']):
         raise Error("Активный пользователь не найден")
     manager = db.one('SELECT manager_id FROM projects WHERE id=?', (pid,))['manager_id']
     if remove:
@@ -158,6 +161,8 @@ def membership(db, user, pid, data, remove=False):
         role = choice(data, 'role', ROLES[1:])
         if uid == manager and role != 'PM':
             raise Error("Руководитель проекта должен сохранять роль PM")
+        if role == 'VIEWER' and db.one('SELECT a.id FROM task_assignments a JOIN tasks t ON t.id=a.task_id WHERE t.project_id=? AND a.user_id=?', (pid, uid)):
+            raise Error("Сначала снимите назначения задач этого участника", 409)
         db.execute('''INSERT INTO project_members(project_id,user_id,role) VALUES (?,?,?)
             ON CONFLICT(project_id,user_id) DO UPDATE SET role=excluded.role''', (pid,uid,role))
     audit(db, user, pid, 'remove_member' if remove else 'set_member', 'users', uid)
@@ -182,7 +187,7 @@ def snapshot(db, user, entity, eid, row, reason=''):
 
 
 def save_entity(db, user, pid, entity, data, eid=None):
-    role = project_role(db, user, pid)
+    role = project_role(db, user, pid, write=True)
     allowed = {'requirements':('ADMIN','PM','ANALYST'), 'tasks':('ADMIN','PM','ANALYST','DEV','QA'),
                'documents':('ADMIN','PM','ANALYST','DEV'), 'stages':('ADMIN','PM')}
     if entity not in allowed:
@@ -248,6 +253,8 @@ def save_entity(db, user, pid, entity, data, eid=None):
         values['updated_at'] = now()
     if entity in ('requirements','documents'):
         if old:
+            if type(incoming.get('version')) is not int or incoming['version'] < 1:
+                raise Error("version: требуется положительное целое число")
             if incoming.get('version') != old['version']:
                 raise Error("Запись изменена другим пользователем. Обновите страницу",409)
             # Условный UPDATE защищает от одновременных правок и в PostgreSQL.
@@ -273,13 +280,15 @@ def save_entity(db, user, pid, entity, data, eid=None):
 
 
 def assign(db, user, pid, eid, data):
-    allow(project_role(db,user,pid),('ADMIN','PM'))
+    allow(project_role(db,user,pid,write=True),('ADMIN','PM'))
     get_entity(db,'tasks',eid,pid)
     ids = data.get('user_ids')
     if not isinstance(ids,list) or len(ids)>50:
         raise Error("Укажите список исполнителей")
     ids = sorted(set(number(i) for i in ids))
     for uid in ids:
+        # Блокировка учётной записи согласует назначение с блокировкой пользователя.
+        db.locked_one('SELECT id FROM users WHERE id=?', (uid,), shared=True)
         if not db.one('SELECT m.id FROM project_members m JOIN users u ON u.id=m.user_id WHERE m.project_id=? AND m.user_id=? AND u.active=1 AND m.role<>?',(pid,uid,'VIEWER')):
             raise Error("Исполнитель должен быть активным участником проекта с правом редактирования")
     db.execute('DELETE FROM task_assignments WHERE task_id=?',(eid,))
@@ -309,7 +318,7 @@ def project_detail(db, user, pid):
 
 
 def comment(db,user,pid,data):
-    role = project_role(db,user,pid)
+    role = project_role(db,user,pid,write=True)
     allow(role,ROLES[:-1])
     entity = choice(data,'entity_type',('requirements','tasks','documents'))
     eid = number(data.get('entity_id'))

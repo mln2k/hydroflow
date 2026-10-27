@@ -3,7 +3,7 @@
 const {chromium}=require('playwright');
 const assert=require('node:assert/strict');
 (async()=>{
-  const browser=await chromium.launch({headless:true});
+  const browser=await chromium.launch({headless:true,channel:process.env.HF_BROWSER_CHANNEL||undefined});
   const page=await browser.newPage({viewport:{width:1440,height:1000}});
   const errors=[];
   page.on('pageerror',e=>errors.push(e.message));
