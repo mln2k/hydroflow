@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: hydroflow-demo
+    runtime: python
+    plan: free
+    autoDeployTrigger: "off"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m hydroflow.deploy
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.14
+      - key: DATABASE_URL
+        sync: false
+      - key: HYDROFLOW_ADMIN_PASSWORD
+        sync: false
+      - key: HYDROFLOW_ADMIN_EMAIL
+        value: admin@example.local
+      - key: COOKIE_SECURE
+        value: "1"

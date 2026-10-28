@@ -1,3 +1,53 @@
+# Проверки HydroFlow: Flask и веб-требования
+
+Реализация проверена на коммите `23689df400b9c0f9007cd73493a40613408d498b`, ветка `dissertation/flask-pages-2026-10-28`. Последующие коммиты комплекта содержат документацию/макеты/счётчики, если не оговорено отдельно. Начальная точка c89860b повторно прошла 44 теста и два браузерных сценария до переноса. Это не заменяло повторной проверки после изменений.
+
+| Проверка | Фактический результат |
+| --- | --- |
+| Windows, Python 3.12.14, SQLite, unittest | **57/57 успешно**, 43.197 s: 44 прежних + 13 новых; отдельные временные БД |
+| compileall hydroflow; node --check app.js/pages.js; pip check | успешно |
+| Google Chrome 156.0.8078.48 | browser_smoke, browser_audit, browser_pages успешно |
+| Microsoft Edge 156.0.4314.50 | browser_pages успешно; это отдельный запуск msedge, не переименование Chromium |
+| Firefox 153.0 (Playwright build 1538) | browser_pages успешно, реальный Firefox-движок; Windows запуск вне sandbox. Это патченная сборка Playwright, не ручной прогон установленного release Firefox |
+| Яндекс.Браузер | не установлен/не выполнено; ручной сценарий в test-plan.md |
+| Viewport | 1920×1080, 1366×768, 390×844; прямые URL/reload/back, меню, формы, отсутствие общего overflow. Это эмуляция окна, не физические устройства |
+| Макеты | 15 страниц + индекс открыты, все локальные ссылки проверены; обзор desktop и feedback mobile просмотрены визуально |
+| Генератор учебной БД | 6 ролей, вход каждой, повторное создание по занятым путям отклонено |
+| Миграция/backup | v1→v2 сохраняет все 13 прежних таблиц, версии и вложения; повторные/конкурентные миграции; SQLite backup/restore в тестах |
+| PostgreSQL/Docker/CI | [Actions 40767745101](https://github.com/mln2k/hydroflow/actions/runs/40767745101): **все 6 jobs успешно** на 23689df |
+
+CI: SQLite на Python 3.11, 3.12, 3.13; PostgreSQL 16/Python 3.12 (54 проверки приложения на PostgreSQL и 3 CLI-проверки на временной SQLite); Chromium с тремя сценариями и Firefox с browser_pages; Docker build, Compose, init дважды, повторный hosting bootstrap на PostgreSQL и healthcheck. Локально Docker и PostgreSQL не запускались: их результат получен из CI, а не предположен по SQLite. Предварительный [запуск на 5b4d213](https://github.com/mln2k/hydroflow/actions/runs/40766060935) также прошёл, но не покрывал позднее найденную HEAD-регрессию.
+
+## Что проверено новыми тестами
+
+PagesTests: прямые HTML-маршруты, авторизация по ролям, поля профиля/назначения, Host/Origin/размер/JSON, успешные входы, **HEAD не изменяет данные или audit**. FeedbackTests: чужие ID, подмена автора/даты, ADMIN-only ответы, версии, лимиты, CSRF и повторная отправка. NewIntegrityTests: конкурентный replay, взаимная блокировка ADMIN, откат при ошибке, миграция с сохранностью всех таблиц и одновременный migrate. OperationsTests: генератор и шесть действительных аккаунтов.
+
+HEAD-регрессия сначала воспроизведена на одноразовой БД: автоматический HEAD во Flask попадал в ветку удаления требования/задачи. После исправления один тест проверяет статус, пустое тело и равенство шести таблиц до/после запросов. Тест не удалён и не ослаблен. Дефекты, исходные несоответствия и корректировки тестов разделены в [bug-reports.md](bug-reports.md).
+
+В браузере XSS проверяется через фактический DOM: строки с img/onerror в имени, теме, тексте и ответе остаются текстом, элементы img не появляются. Старый сценарий сохраняет проверки прежних сущностей, CSV-формул, JSON, печати, байтов прежнего вложения, статусов, ролей, сессий, повторных отправок и сети. Зелёный тест не означает полноту security-аудита.
+
+## Повторение
+
+```sh
+python -m pip install -r requirements.txt
+python -m unittest discover -s tests -v
+python -m compileall -q hydroflow
+node --check static/app.js
+node --check static/pages.js
+npm install --no-save playwright@1.62.1
+npx playwright install chromium firefox
+```
+
+В отдельной тестовой БД выполнить init, запустить serve. Задать `HF_TEST_URL`, `HF_TEST_PASSWORD`, при необходимости `HF_TEST_EMAIL`. Запустить `node tests/browser_smoke.cjs`, `node tests/browser_audit.cjs`, `node tests/browser_pages.cjs`. На Windows smoke требует доступные пути `HF_SCREENSHOT`/`HF_MOBILE_SCREENSHOT` вместо дефолтного /tmp. Для Chrome/Edge установить `HF_BROWSER_CHANNEL=chrome` / `msedge`. Для Firefox удалить HF_BROWSER_CHANNEL, установить HF_BROWSER=firefox. Для Яндекса можно указать `HF_BROWSER_EXECUTABLE` на его browser.exe, но совместимость автоматизации здесь не проверялась; ручной чек-лист обязателен при недоступности запуска.
+
+PostgreSQL: `TEST_DATABASE_URL` только отдельной одноразовой БД с правом CREATE SCHEMA. Каждый тест создаёт случайную схему и удаляет только её. Тест обновления v1 реконструирует v1 в этой схеме/временном SQLite-файле, не трогая пользовательские установки.
+
+Не выполнены: macOS как реальная ОС, Яндекс.Браузер, физические устройства, нагрузочные испытания, реальные Render/Neon deploy/restart/pg_restore, вузовская методика объёма и приёмка бизнес-процесса. План и условия приёмки — [test-plan.md](test-plan.md).
+
+---
+
+## Исторический отчёт аудита 27.10.2026 (до Flask)
+
 # Результаты проверок
 
 ## Аудит 27 октября 2026 года

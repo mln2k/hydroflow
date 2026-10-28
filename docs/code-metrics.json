@@ -1,0 +1,306 @@
+{
+  "method": "HF-metrics-1; auxiliary units across languages must not be summed as official logical LOC",
+  "excludes": [
+    "docs/mockups (generated design artifacts)",
+    "dependencies",
+    "data",
+    "comments",
+    "blank/control-only lines",
+    "SVG icon"
+  ],
+  "groups": {
+    "application": {
+      "totals": {
+        "Python": {
+          "physical_total": 1289,
+          "physical_code": 1082,
+          "auxiliary_units": 850
+        },
+        "CSS": {
+          "physical_total": 8,
+          "physical_code": 5,
+          "auxiliary_units": 496
+        },
+        "JavaScript": {
+          "physical_total": 174,
+          "physical_code": 161,
+          "auxiliary_units": 115
+        },
+        "HTML": {
+          "physical_total": 27,
+          "physical_code": 27,
+          "auxiliary_units": 31
+        }
+      },
+      "files": [
+        {
+          "file": "hydroflow/__init__.py",
+          "language": "Python",
+          "physical_total": 2,
+          "physical_code": 1,
+          "auxiliary_units": 1,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "hydroflow/__main__.py",
+          "language": "Python",
+          "physical_total": 109,
+          "physical_code": 102,
+          "auxiliary_units": 92,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "hydroflow/db.py",
+          "language": "Python",
+          "physical_total": 174,
+          "physical_code": 152,
+          "auxiliary_units": 73,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "hydroflow/deploy.py",
+          "language": "Python",
+          "physical_total": 42,
+          "physical_code": 34,
+          "auxiliary_units": 31,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "hydroflow/security.py",
+          "language": "Python",
+          "physical_total": 37,
+          "physical_code": 26,
+          "auxiliary_units": 25,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "hydroflow/server.py",
+          "language": "Python",
+          "physical_total": 78,
+          "physical_code": 62,
+          "auxiliary_units": 45,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "hydroflow/services.py",
+          "language": "Python",
+          "physical_total": 429,
+          "physical_code": 371,
+          "auxiliary_units": 325,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "hydroflow/web/__init__.py",
+          "language": "Python",
+          "physical_total": 1,
+          "physical_code": 0,
+          "auxiliary_units": 0,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "hydroflow/web/account.py",
+          "language": "Python",
+          "physical_total": 53,
+          "physical_code": 41,
+          "auxiliary_units": 27,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "hydroflow/web/admin.py",
+          "language": "Python",
+          "physical_total": 22,
+          "physical_code": 16,
+          "auxiliary_units": 12,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "hydroflow/web/auth.py",
+          "language": "Python",
+          "physical_total": 76,
+          "physical_code": 64,
+          "auxiliary_units": 53,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "hydroflow/web/common.py",
+          "language": "Python",
+          "physical_total": 74,
+          "physical_code": 61,
+          "auxiliary_units": 53,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "hydroflow/web/pages.py",
+          "language": "Python",
+          "physical_total": 64,
+          "physical_code": 48,
+          "auxiliary_units": 32,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "hydroflow/web/projects.py",
+          "language": "Python",
+          "physical_total": 128,
+          "physical_code": 104,
+          "auxiliary_units": 81,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "static/app.css",
+          "language": "CSS",
+          "physical_total": 8,
+          "physical_code": 5,
+          "auxiliary_units": 496,
+          "unit_method": "CSS-декларации свойств"
+        },
+        {
+          "file": "static/app.js",
+          "language": "JavaScript",
+          "physical_total": 109,
+          "physical_code": 103,
+          "auxiliary_units": 4,
+          "unit_method": "разделители ; вне строк: ориентир, не число операторов; template expressions исключены"
+        },
+        {
+          "file": "static/pages.js",
+          "language": "JavaScript",
+          "physical_total": 65,
+          "physical_code": 58,
+          "auxiliary_units": 111,
+          "unit_method": "разделители ; вне строк: ориентир, не число операторов; template expressions исключены"
+        },
+        {
+          "file": "templates/app.html",
+          "language": "HTML",
+          "physical_total": 19,
+          "physical_code": 19,
+          "auxiliary_units": 19,
+          "unit_method": "открывающие HTML-элементы; Jinja-выражения не операторы"
+        },
+        {
+          "file": "templates/error.html",
+          "language": "HTML",
+          "physical_total": 8,
+          "physical_code": 8,
+          "auxiliary_units": 12,
+          "unit_method": "открывающие HTML-элементы; Jinja-выражения не операторы"
+        }
+      ]
+    },
+    "tests": {
+      "totals": {
+        "JavaScript": {
+          "physical_total": 371,
+          "physical_code": 343,
+          "auxiliary_units": 267
+        },
+        "Python": {
+          "physical_total": 827,
+          "physical_code": 733,
+          "auxiliary_units": 755
+        }
+      },
+      "files": [
+        {
+          "file": "tests/browser_audit.cjs",
+          "language": "JavaScript",
+          "physical_total": 206,
+          "physical_code": 189,
+          "auxiliary_units": 78,
+          "unit_method": "разделители ; вне строк: ориентир, не число операторов; template expressions исключены"
+        },
+        {
+          "file": "tests/browser_pages.cjs",
+          "language": "JavaScript",
+          "physical_total": 93,
+          "physical_code": 84,
+          "auxiliary_units": 115,
+          "unit_method": "разделители ; вне строк: ориентир, не число операторов; template expressions исключены"
+        },
+        {
+          "file": "tests/browser_smoke.cjs",
+          "language": "JavaScript",
+          "physical_total": 72,
+          "physical_code": 70,
+          "auxiliary_units": 74,
+          "unit_method": "разделители ; вне строк: ориентир, не число операторов; template expressions исключены"
+        },
+        {
+          "file": "tests/test_application.py",
+          "language": "Python",
+          "physical_total": 290,
+          "physical_code": 249,
+          "auxiliary_units": 262,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "tests/test_audit.py",
+          "language": "Python",
+          "physical_total": 247,
+          "physical_code": 224,
+          "auxiliary_units": 229,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "tests/test_dissertation.py",
+          "language": "Python",
+          "physical_total": 215,
+          "physical_code": 195,
+          "auxiliary_units": 193,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "tests/test_operations.py",
+          "language": "Python",
+          "physical_total": 75,
+          "physical_code": 65,
+          "auxiliary_units": 71,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        }
+      ]
+    },
+    "tools": {
+      "totals": {
+        "Python": {
+          "physical_total": 199,
+          "physical_code": 161,
+          "auxiliary_units": 125
+        }
+      },
+      "files": [
+        {
+          "file": "scripts/code_metrics.py",
+          "language": "Python",
+          "physical_total": 76,
+          "physical_code": 62,
+          "auxiliary_units": 61,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "scripts/create_demo.py",
+          "language": "Python",
+          "physical_total": 40,
+          "physical_code": 34,
+          "auxiliary_units": 32,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "scripts/git_history.py",
+          "language": "Python",
+          "physical_total": 25,
+          "physical_code": 17,
+          "auxiliary_units": 14,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        },
+        {
+          "file": "scripts/make_mockups.py",
+          "language": "Python",
+          "physical_total": 58,
+          "physical_code": 48,
+          "auxiliary_units": 18,
+          "unit_method": "AST statements без docstrings (вложенные считаются отдельно)"
+        }
+      ]
+    }
+  }
+}

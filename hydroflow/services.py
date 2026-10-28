@@ -2,7 +2,7 @@
 import base64
 import json
 import re
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from .security import now, hash_password
 
 ROLES = ('ADMIN', 'PM', 'ANALYST', 'DEV', 'QA', 'VIEWER')
@@ -345,3 +345,85 @@ def report(db,user,pid):
                      task_ids=[t['id'] for t in tasks if t['requirement_id']==r['id']],
                      completed_task_ids=[t['id'] for t in tasks if t['requirement_id']==r['id'] and t['status']=='done'])
                 for r in p['requirements'] if r['version']>1])
+
+
+def manage_user(db, user, uid, data):
+    allow(user['role'], ('ADMIN',))
+    # Общая строка блокировки исключает одновременное отключение двух последних ADMIN.
+    db.locked_one("SELECT name FROM system_locks WHERE name='administrators'")
+    actor = db.one('SELECT role,active FROM users WHERE id=?', (user['id'],))
+    if not actor or not actor['active'] or actor['role'] != 'ADMIN':
+        raise Error('Недостаточно прав для этого действия', 403)
+    if uid == user['id']:
+        raise Error('Изменение собственной роли или активности запрещено')
+    account = db.locked_one('SELECT * FROM users WHERE id=?', (uid,))
+    if not account:
+        raise Error('Пользователь не найден', 404)
+    if set(data) - {'role', 'active'}:
+        raise Error('Недопустимые поля пользователя')
+    values = {}
+    if 'active' in data:
+        if type(data['active']) is not bool:
+            raise Error('active: ожидается boolean')
+        values['active'] = int(data['active'])
+    if 'role' in data:
+        values['role'] = choice(data, 'role', ROLES)
+    if not values:
+        raise Error('Нет изменений')
+    if account['role'] == 'ADMIN' and account['active'] and (
+        values.get('active', 1) == 0 or values.get('role', 'ADMIN') != 'ADMIN'
+    ):
+        remaining = db.one("SELECT COUNT(*) AS n FROM users WHERE role='ADMIN' AND active=1 AND id<>?", (uid,))
+        if not remaining['n']:
+            raise Error('Нельзя отключить последнего активного администратора', 409)
+    update(db, 'users', uid, values)
+    db.execute('DELETE FROM sessions WHERE user_id=?', (uid,))
+    audit(db, user, None, 'update', 'users', uid, json.dumps(values))
+
+
+def create_feedback(db, user, data):
+    subject = text(data, 'subject', limit=160)
+    category = choice(data, 'category', ('question', 'bug', 'suggestion'))
+    body = text(data, 'body', limit=10000)
+    key = text(data, 'request_key', limit=80)
+    if not re.fullmatch(r'[a-zA-Z0-9_-]{16,80}', key):
+        raise Error('Некорректный ключ повторной отправки')
+    db.locked_one('SELECT id FROM users WHERE id=?', (user['id'],))
+    existing = db.one('SELECT * FROM feedback WHERE user_id=? AND request_key=?', (user['id'], key))
+    if existing:
+        if (existing['subject'], existing['category'], existing['body']) != (subject, category, body):
+            raise Error('Ключ отправки уже использован для другого обращения', 409)
+        return existing['id'], False
+    since = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat(timespec='seconds')
+    count = db.one('SELECT COUNT(*) AS n FROM feedback WHERE user_id=? AND created_at>=?', (user['id'], since))['n']
+    if count >= 5:
+        raise Error('Не более пяти новых обращений за час. Повторите позже', 429)
+    fid = db.insert('feedback', dict(user_id=user['id'], subject=subject, category=category,
+        body=body, status='new', reply='', answered_by=None, request_key=key, version=1,
+        created_at=now(), updated_at=now()))
+    audit(db, user, None, 'create', 'feedback', fid)
+    return fid, True
+
+
+def get_feedback(db, user, fid):
+    row = db.one('SELECT * FROM feedback WHERE id=?', (fid,))
+    if not row or (row['user_id'] != user['id'] and user['role'] != 'ADMIN'):
+        raise Error('Обращение не найдено', 404)
+    return row
+
+
+def answer_feedback(db, user, fid, data):
+    allow(user['role'], ('ADMIN',))
+    old = get_feedback(db, user, fid)
+    if set(data) - {'status', 'reply', 'version'}:
+        raise Error('Недопустимые поля обращения')
+    if type(data.get('version')) is not int:
+        raise Error('version: требуется целое число')
+    status = choice(data, 'status', ('new', 'work', 'closed'), old['status'])
+    reply = optional(data, 'reply', old['reply'], limit=10000)
+    changed = db.execute('''UPDATE feedback SET status=?,reply=?,answered_by=?,
+        updated_at=?,version=version+1 WHERE id=? AND version=?''',
+        (status, reply, user['id'], now(), fid, data['version'])).rowcount
+    if not changed:
+        raise Error('Обращение уже изменено. Обновите страницу', 409)
+    audit(db, user, None, 'answer', 'feedback', fid)

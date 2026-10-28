@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#142e3b">
+  <title>{{ title }} · HydroFlow</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script><script src="/pages.js" defer></script>
+</head>
+<body data-page="{{ page }}">
+  <a class="skip-link" href="#main-content">Перейти к содержимому</a>
+  <div id="app"><main class="loading"><h1>{{ title }}</h1><p>Загрузка HydroFlow…</p></main></div>
+  <noscript>Для работы с интерактивными страницами HydroFlow включите JavaScript.</noscript>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="modal" aria-labelledby="modal-title"></dialog>
+</body>
+</html>

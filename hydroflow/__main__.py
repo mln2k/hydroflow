@@ -8,7 +8,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from .db import migrate, transaction
 from .security import now, hash_password
-from .server import make_server
+from .server import serve
 from . import services as s
 
 
@@ -96,14 +96,9 @@ def main():
             s.save_entity(db,admin,pid,'documents',dict(title='Техническое задание',doc_type='TZ',content='Учебная версия. Цель: разработать журнал наблюдений, согласование отчётов и разграничение доступа.'))
             print('Демонстрационный проект создан.')
     else:
-        server=make_server(args.host,args.port)
-        print(f'HydroFlow: http://{args.host}:{args.port}',flush=True)
-        try:
-            server.serve_forever()
-        except KeyboardInterrupt:
-            pass
-        finally:
-            server.server_close()
+        print(f'HydroFlow (Waitress): http://{args.host}:{args.port}',flush=True)
+        serve(args.host,args.port)
+
 
 
 if __name__=='__main__':

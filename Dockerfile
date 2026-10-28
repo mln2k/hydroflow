@@ -6,6 +6,7 @@ RUN pip install --no-cache-dir -r requirements.txt && useradd --uid 10001 --crea
     && mkdir /app/data && chown app:app /app/data
 COPY --chown=app:app hydroflow ./hydroflow
 COPY --chown=app:app static ./static
+COPY --chown=app:app templates ./templates
 USER app
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health',timeout=3)"

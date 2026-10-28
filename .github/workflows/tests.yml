@@ -13,6 +13,7 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '${{ matrix.python }}'
+      - run: pip install -r requirements.txt
       - run: python -m unittest discover -s tests -v
       - run: python -m compileall -q hydroflow
   postgres:
@@ -46,15 +47,18 @@ jobs:
         with:
           node-version: '22'
           package-manager-cache: false
-      - run: npm install --no-save playwright
-      - run: npx playwright install --with-deps chromium
-      - run: node --check static/app.js
+      - run: pip install -r requirements.txt
+      - run: npm install --no-save playwright@1.62.1
+      - run: npx playwright install --with-deps chromium firefox
+      - run: node --check static/app.js && node --check static/pages.js
       - run: |
           python -m hydroflow init
           python -m hydroflow serve > server.log 2>&1 &
           python -c "import urllib.request,time; exec('for _ in range(30):\n try:\n  urllib.request.urlopen(\"http://127.0.0.1:8000/api/health\"); break\n except OSError: time.sleep(1)\nelse: raise SystemExit(\"Server unavailable\")')"
           node tests/browser_smoke.cjs
           node tests/browser_audit.cjs
+          node tests/browser_pages.cjs
+          HF_BROWSER=firefox node tests/browser_pages.cjs
         env:
           HYDROFLOW_ADMIN_PASSWORD: CI-only-password-2468
           HF_TEST_PASSWORD: CI-only-password-2468
@@ -72,6 +76,8 @@ jobs:
       - run: docker compose up -d --wait db
       - run: docker compose run --rm -e HYDROFLOW_ADMIN_PASSWORD app python -m hydroflow init
       - run: docker compose run --rm -e HYDROFLOW_ADMIN_PASSWORD app python -m hydroflow init
+      - name: Idempotent hosting bootstrap against PostgreSQL
+        run: docker compose run --rm -e PUBLIC_ORIGIN=https://demo.example.local app python -c "from hydroflow.deploy import prepare; prepare(); prepare()"
       - run: docker compose up -d --wait app
       - run: curl --fail http://127.0.0.1:8000/api/health
       - name: Logs
