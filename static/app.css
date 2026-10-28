@@ -4,3 +4,5 @@
 @media(max-width:800px){.menu-toggle{display:block;position:sticky;top:0;z-index:5;width:100%;border-radius:0;background:#123c39;color:#fff}.sidebar{display:none!important;height:auto!important;max-height:75vh;position:relative!important}.sidebar.is-open{display:flex!important}.sidebar nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.sidebar nav .workspace{grid-column:1/-1}.shell{display:block}.topbar{height:auto;min-height:56px;padding:16px}.sidebar .spacer{display:none}}
 
 .topbar nav span{display:inline}@media print{.menu-toggle{display:none}}
+
+.heading>div{min-width:0;max-width:100%}h1,h2,h3,.project-meta,.panel-body{overflow-wrap:anywhere}

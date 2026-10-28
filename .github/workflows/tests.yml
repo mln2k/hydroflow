@@ -76,6 +76,8 @@ jobs:
       - run: docker compose up -d --wait db
       - run: docker compose run --rm -e HYDROFLOW_ADMIN_PASSWORD app python -m hydroflow init
       - run: docker compose run --rm -e HYDROFLOW_ADMIN_PASSWORD app python -m hydroflow init
+      - name: Idempotent hosting bootstrap against PostgreSQL
+        run: docker compose run --rm -e PUBLIC_ORIGIN=https://demo.example.local app python -c "from hydroflow.deploy import prepare; prepare(); prepare()"
       - run: docker compose up -d --wait app
       - run: curl --fail http://127.0.0.1:8000/api/health
       - name: Logs

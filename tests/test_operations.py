@@ -10,6 +10,30 @@ import unittest
 
 
 class OperationsTests(unittest.TestCase):
+    def test_demo_generator_all_roles_and_no_overwrite(self):
+        from hydroflow.server import create_app
+        accounts = self.root/'accounts.txt'
+        root = Path(__file__).resolve().parents[1]
+        command = [sys.executable, str(root/'scripts/create_demo.py'), '--database', str(self.source), '--accounts', str(accounts)]
+        result = subprocess.run(command,cwd=root,capture_output=True,env=self.env,timeout=30)
+        self.assertEqual(result.returncode,0,result.stderr)
+        client = create_app({'DATABASE_URL':'sqlite:///'+str(self.source)}).test_client()
+        roles = []
+        for line in accounts.read_text(encoding='utf-8').splitlines():
+            if '  пароль: ' not in line:
+                continue
+            identity,password = line.split('  пароль: ',1)
+            role,email = identity.split(': ',1)
+            response = client.post('/api/login',json={'email':email,'password':password})
+            self.assertEqual(response.status_code,200)
+            self.assertEqual(response.json['user']['role'],role)
+            roles.append(role)
+        self.assertEqual(set(roles),{'ADMIN','PM','ANALYST','DEV','QA','VIEWER'})
+        original = accounts.read_bytes()
+        second = subprocess.run(command,cwd=root,capture_output=True,env=self.env,timeout=30)
+        self.assertNotEqual(second.returncode,0)
+        self.assertEqual(accounts.read_bytes(),original)
+
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
