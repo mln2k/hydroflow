@@ -137,15 +137,38 @@ SCHEMA = [
 
 def migrate(url=None):
     with transaction(url) as db:
+        if db.pg:
+            db.execute("SELECT pg_advisory_xact_lock(hashtext(current_schema() || ':hydroflow:migrate'))")
         db.execute("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY)")
-        if db.one("SELECT version FROM schema_migrations WHERE version=1"):
-            return
-        for statement in SCHEMA:
-            if db.pg:
-                statement = statement.replace("id INTEGER PRIMARY KEY", "id BIGSERIAL PRIMARY KEY")
-                # Внешние ключи должны соответствовать BIGSERIAL.
-                for field in ('user_id','manager_id','project_id','requirement_id','stage_id','created_by',
-                              'changed_by','task_id','assigned_by','document_id','author_id','actor_id','entity_id'):
-                    statement = statement.replace(f"{field} INTEGER", f"{field} BIGINT")
-            db.execute(statement)
-        db.execute("INSERT INTO schema_migrations(version) VALUES (1)")
+        if not db.one("SELECT version FROM schema_migrations WHERE version=1"):
+            for statement in SCHEMA:
+                if db.pg:
+                    statement = statement.replace("id INTEGER PRIMARY KEY", "id BIGSERIAL PRIMARY KEY")
+                    # Внешние ключи должны соответствовать BIGSERIAL.
+                    for field in ('user_id','manager_id','project_id','requirement_id','stage_id','created_by',
+                                  'changed_by','task_id','assigned_by','document_id','author_id','actor_id','entity_id'):
+                        statement = statement.replace(f"{field} INTEGER", f"{field} BIGINT")
+                db.execute(statement)
+            db.execute("INSERT INTO schema_migrations(version) VALUES (1)")
+        if not db.one("SELECT version FROM schema_migrations WHERE version=2"):
+            for statement in SCHEMA_V2:
+                if db.pg:
+                    statement = statement.replace('id INTEGER PRIMARY KEY', 'id BIGSERIAL PRIMARY KEY')
+                    statement = statement.replace('user_id INTEGER', 'user_id BIGINT').replace('answered_by INTEGER', 'answered_by BIGINT')
+                db.execute(statement)
+            db.execute("INSERT INTO system_locks(name) VALUES ('administrators')")
+            db.execute("INSERT INTO schema_migrations(version) VALUES (2)")
+
+
+SCHEMA_V2 = [
+    "CREATE TABLE system_locks (name TEXT PRIMARY KEY)",
+    """CREATE TABLE feedback (
+        id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id),
+        subject TEXT NOT NULL, category TEXT NOT NULL CHECK(category IN ('question','bug','suggestion')),
+        body TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('new','work','closed')),
+        reply TEXT NOT NULL DEFAULT '', answered_by INTEGER REFERENCES users(id),
+        request_key TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(user_id,request_key))""",
+    "CREATE INDEX idx_feedback_user_created ON feedback(user_id,created_at)",
+    "CREATE INDEX idx_feedback_status ON feedback(status,id)",
+]

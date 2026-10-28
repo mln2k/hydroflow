@@ -48,7 +48,7 @@ const {randomUUID}=require('node:crypto');
     await admin.api(root+'/documents/'+did,'PATCH',{version:1,filename:'new.txt',file_base64:Buffer.from('New bytes').toString('base64')});
     await admin.api(root+'/comments','POST',{entity_type:'tasks',entity_id:tid,text:payload},201);
     async function openProject(page){
-      await page.reload();
+      await page.goto(base+'/projects');
       await page.locator('.project-card').filter({hasText:project}).getByRole('button',{name:'Открыть проект →'}).click();
       await expect(page.getByRole('heading',{name:project,exact:true})).toBeVisible();
     }
@@ -165,7 +165,7 @@ const {randomUUID}=require('node:crypto');
           await tab(page,name);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,name+' mobile overflow');
         }
         await tab(page,'Документы');await tab(page,'Document '+payload);
-        await tab(admin.page,'Команда и доступ');
+        await admin.page.getByRole('link',{name:'Команда и доступ',exact:true}).click();
         const accountRow=admin.page.getByRole('row').filter({hasText:users.VIEWER.email});
         await accountRow.getByRole('button',{name:'Заблокировать',exact:true}).click();
         await expect(accountRow.getByRole('button',{name:'Разблокировать',exact:true})).toBeVisible();
