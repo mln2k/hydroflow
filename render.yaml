@@ -3,7 +3,7 @@ services:
     name: hydroflow-demo
     runtime: python
     plan: free
-    autoDeployTrigger: off
+    autoDeployTrigger: "off"
     buildCommand: pip install -r requirements.txt
     startCommand: python -m hydroflow.deploy
     healthCheckPath: /api/health
