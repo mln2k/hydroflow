@@ -11,14 +11,14 @@ bp = Blueprint('projects', __name__, url_prefix='/api/projects')
 
 def project(pid):
     pid = s.number(pid)
-    role = s.project_role(g.db, g.user, pid, write=request.method != 'GET')
+    role = s.project_role(g.db, g.user, pid, write=request.method not in ('GET', 'HEAD'))
     return pid, role
 
 
 @bp.route('', methods=['GET', 'POST'])
 @api_view()
 def projects():
-    if request.method == 'GET':
+    if request.method in ('GET', 'HEAD'):
         return s.list_projects(g.db, g.user)
     return {'id': s.save_project(g.db, g.user, g.data)}, 201
 
@@ -27,7 +27,7 @@ def projects():
 @api_view()
 def details(pid):
     pid, _ = project(pid)
-    if request.method == 'GET':
+    if request.method in ('GET', 'HEAD'):
         return s.project_detail(g.db, g.user, pid)
     return {'id': s.save_project(g.db, g.user, g.data, pid)}
 
@@ -89,7 +89,7 @@ def entity(pid, entity, eid):
     pid, role = project(pid)
     eid = s.number(eid)
     record = s.get_entity(g.db, entity, eid, pid)
-    if request.method == 'GET':
+    if request.method in ('GET', 'HEAD'):
         return record
     if request.method == 'PATCH':
         return {'id': s.save_entity(g.db, g.user, pid, entity, g.data, eid)}

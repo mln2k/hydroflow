@@ -12,6 +12,22 @@ from hydroflow.server import create_app
 
 
 class PagesTests(HTTPFixture):
+    def test_head_requests_never_mutate_records_or_audit(self):
+        with transaction(self.url) as db:
+            rid = self.create_req(db)
+            tid = self.create_task(db)
+            before = {t:db.all(f'SELECT * FROM {t} ORDER BY id') for t in ['projects','requirements','tasks','requirement_versions','audit_log','users']}
+        self.login()
+        client = create_app({'DATABASE_URL':self.url}).test_client()
+        client.set_cookie('hf_session',self.cookie.split('=',1)[1])
+        for url in ['/api/projects','/api/users',f'/api/projects/{self.pid}',f'/api/projects/{self.pid}/requirements/{rid}',f'/api/projects/{self.pid}/tasks/{tid}']:
+            response = client.head(url)
+            with self.subTest(url=url):
+                self.assertEqual(response.status_code,200,url)
+                self.assertEqual(response.data,b'')
+        with transaction(self.url) as db:
+            self.assertEqual(before,{t:db.all(f'SELECT * FROM {t} ORDER BY id') for t in before})
+
     def test_successful_logins_do_not_exhaust_failed_attempt_budget(self):
         for _ in range(16):
             self.login('VIEWER')
